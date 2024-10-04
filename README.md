@@ -5,6 +5,8 @@
 The **AI21 Studio Manifold Pipe** is a open-webui function designed to interact with the AI21 Studio API, facilitating seamless communication and data processing with AI models provided by AI21. 
 This repository contains a single Python file that implements a `Pipe` class to handle API requests and responses, ensuring efficient and secure interactions with the AI21 models.
 
+Currently supported models are: **Jamba 1.5 Large and Jamba 1.5 Mini**
+
 ## Features
 
 - **Modular Design**: The code is structured to adhere to SOLID principles, ensuring that each class and method has a single responsibility.

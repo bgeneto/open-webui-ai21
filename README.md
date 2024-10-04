@@ -22,7 +22,7 @@ This repository contains a single Python file that implements a `Pipe` class to 
 
 ## Installation
 
-1. Install this function in your Open WebUI instance directly via this (link)[https://openwebui.com/f/bgeneto/ai21_studio] or paste the source code in Workspaces --> Functions.
+1. Install this function in your Open WebUI instance directly via this [link](https://openwebui.com/f/bgeneto/ai21_studio) or paste the source code in Workspaces --> Functions.
 
 ## Usage
 

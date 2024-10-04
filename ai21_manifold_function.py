@@ -3,7 +3,7 @@ title: AI21 Studio Manifold Pipe
 authors: bgeneto
 author_url: https://github.com/bgeneto/open-webui-ai21
 funding_url: https://github.com/open-webui
-version: 0.1.1
+version: 0.1.2
 required_open_webui_version: 0.3.17
 license: MIT
 requirements: pydantic, ai21
@@ -11,7 +11,7 @@ environment_variables: AI21_API_KEY
 """
 
 import os
-from typing import Generator, List, Union
+from typing import Dict, Generator, List, Union
 
 from ai21 import AI21Client
 from ai21.models.chat.chat_message import AssistantMessage, SystemMessage, UserMessage
@@ -21,10 +21,11 @@ DEBUG = False
 
 
 class AI21Service:
-    def __init__(self, config):
-        if not config["AI21_API_KEY"]:
+    def __init__(self, config: Dict, pipe_id: str):
+        if "AI21_API_KEY" not in config:
             raise Exception("Error: AI21_API_KEY is not set!")
         self.client = AI21Client(api_key=config["AI21_API_KEY"])
+        self.pipe_id = pipe_id
 
     def get_available_models(self) -> List[dict]:
         """
@@ -83,7 +84,7 @@ class AI21Service:
         Handles the pipe request.
         """
         try:
-            model_id = body["model"].split("ai21.")[1]
+            model_id = body["model"].split(f"{self.pipe_id}.")[1]
             self.validate_model_id(model_id)
 
             messages = body["messages"]
@@ -96,7 +97,7 @@ class AI21Service:
                 messages=ai21_messages,
                 model=model_id,
                 max_tokens=body.get("max_tokens", 4096),
-                temperature=body.get("temperature", 0.4),
+                temperature=body.get("temperature", 0.8),
                 top_p=body.get("top_p", 0.9),
                 stop=body.get("stop", []),
                 stream=stream,
@@ -105,13 +106,23 @@ class AI21Service:
             if stream:
 
                 def stream_generator():
+                    if DEBUG:
+                        print("**DEBUG: Entering stream_generator")
                     for chunk in response:
+                        if DEBUG:
+                            print(f"**DEBUG: Received chunk: {chunk}")
                         if (
                             chunk.choices
                             and chunk.choices[0].delta
                             and chunk.choices[0].delta.content
                         ):
-                            yield chunk.choices[0].delta.content
+                            content = chunk.choices[0].delta.content
+                            if DEBUG:
+                                print(f"**DEBUG: Yielding content: {content}")
+                            yield content
+                        else:
+                            if DEBUG:
+                                print("**DEBUG: Skipping chunk due to missing content")
 
                 return stream_generator()
 
@@ -130,8 +141,8 @@ class Pipe:
         self.id = "ai21_studio"
         self.name = "AI21 Studio: "
         self.config = {"AI21_API_KEY": os.getenv("AI21_API_KEY", "")}
-        self.valves = self.Valves(**self.config)
-        self.service = AI21Service(self.config)
+        self.valves = self.Valves(**{"AI21_API_KEY": os.getenv("AI21_API_KEY", "")})
+        self.service = AI21Service(self.config, self.id)
 
     def pipes(self) -> List[dict]:
         """

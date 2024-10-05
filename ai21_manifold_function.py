@@ -3,7 +3,7 @@ title: AI21 Studio Manifold Pipe
 authors: bgeneto
 author_url: https://github.com/bgeneto/open-webui-ai21
 funding_url: https://github.com/open-webui
-version: 0.1.2
+version: 0.1.3
 required_open_webui_version: 0.3.17
 license: MIT
 requirements: pydantic, ai21
@@ -11,21 +11,25 @@ environment_variables: AI21_API_KEY
 """
 
 import os
-from typing import Dict, Generator, List, Union
+from typing import Generator, List, Union
 
 from ai21 import AI21Client
 from ai21.models.chat.chat_message import AssistantMessage, SystemMessage, UserMessage
 from pydantic import BaseModel, Field
 
-DEBUG = False
-
 
 class AI21Service:
-    def __init__(self, config: Dict, pipe_id: str):
-        if "AI21_API_KEY" not in config:
-            raise Exception("Error: AI21_API_KEY is not set!")
-        self.client = AI21Client(api_key=config["AI21_API_KEY"])
+    def __init__(self, pipe_id: str, valves: BaseModel):
         self.pipe_id = pipe_id
+        self.valves = valves
+        if not self.valves.AI21_API_KEY:
+            raise Exception("Error: AI21_API_KEY is not set!")
+        self.client = AI21Client(api_key=self.valves.AI21_API_KEY)
+        pass
+
+    def update_log_level(self, debug: bool) -> None:
+        self.valves.AI21_DEBUG = debug
+        pass
 
     def get_available_models(self) -> List[dict]:
         """
@@ -45,6 +49,7 @@ class AI21Service:
             raise ValueError(
                 f"Invalid model ID: {model_id}. Available models: {', '.join(available_models)}"
             )
+        pass
 
     def validate_messages(self, messages: List[dict]) -> None:
         """
@@ -54,6 +59,7 @@ class AI21Service:
             isinstance(message, dict) for message in messages
         ):
             raise ValueError("Messages must be a list of dictionaries")
+        pass
 
     def convert_messages(
         self, messages: List[dict]
@@ -106,10 +112,10 @@ class AI21Service:
             if stream:
 
                 def stream_generator():
-                    if DEBUG:
+                    if self.valves.AI21_DEBUG:
                         print("**DEBUG: Entering stream_generator")
                     for chunk in response:
-                        if DEBUG:
+                        if self.valves.AI21_DEBUG:
                             print(f"**DEBUG: Received chunk: {chunk}")
                         if (
                             chunk.choices
@@ -117,11 +123,11 @@ class AI21Service:
                             and chunk.choices[0].delta.content
                         ):
                             content = chunk.choices[0].delta.content
-                            if DEBUG:
+                            if self.valves.AI21_DEBUG:
                                 print(f"**DEBUG: Yielding content: {content}")
                             yield content
                         else:
-                            if DEBUG:
+                            if self.valves.AI21_DEBUG:
                                 print("**DEBUG: Skipping chunk due to missing content")
 
                 return stream_generator()
@@ -135,14 +141,19 @@ class AI21Service:
 class Pipe:
     class Valves(BaseModel):
         AI21_API_KEY: str = Field(default="")
+        AI21_DEBUG: bool = Field(
+            default=False, description="Turn debugging messages on/off"
+        )
+        pass
 
     def __init__(self):
         self.type = "manifold"
         self.id = "ai21_studio"
         self.name = "AI21 Studio: "
         self.config = {"AI21_API_KEY": os.getenv("AI21_API_KEY", "")}
-        self.valves = self.Valves(**{"AI21_API_KEY": os.getenv("AI21_API_KEY", "")})
-        self.service = AI21Service(self.config, self.id)
+        self.valves = self.Valves(**self.config)
+        self.service = AI21Service(self.id, self.valves)
+        pass
 
     def pipes(self) -> List[dict]:
         """
@@ -154,4 +165,5 @@ class Pipe:
         """
         Handles the pipe request.
         """
+        self.service.update_log_level(self.valves.AI21_DEBUG)
         return self.service.process_request(body)
